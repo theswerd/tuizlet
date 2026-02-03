@@ -1,0 +1,94 @@
+{
+  "$schema": 1,
+  "id": "spanish-vocab-ch1",
+  "metadata": {
+    "title": "Spanish Vocabulary - Chapter 1",
+    "description": "Basic greetings and common phrases",
+    "author": "Tuizlet",
+    "language": "en",
+    "targetLanguage": "es",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "tags": ["spanish", "beginner", "greetings"],
+    "difficulty": 1,
+    "estimatedMinutes": 10
+  },
+  "defaultMatchConfig": {
+    "ignoreCase": true,
+    "ignoreAccents": false,
+    "trimWhitespace": true,
+    "normalizeWhitespace": true,
+    "allowTypoDistance": 1,
+    "acceptAlternatives": true
+  },
+  "questionConfig": {
+    "types": ["multiple-choice", "text-input"],
+    "bidirectional": true,
+    "multipleChoiceOptions": 4
+  },
+  "cards": [
+    {
+      "id": "card-001",
+      "front": {
+        "text": "Hello",
+        "hint": "Common greeting"
+      },
+      "back": {
+        "text": "Hola",
+        "example": "¡Hola! ¿Cómo estás?"
+      },
+      "tags": ["greeting"]
+    },
+    {
+      "id": "card-002",
+      "front": {
+        "text": "Good morning",
+        "hint": "Morning greeting"
+      },
+      "back": {
+        "text": "Buenos días",
+        "alternatives": ["Buenos dias"],
+        "explanation": "Literally 'Good days' - used until noon"
+      },
+      "tags": ["greeting", "time-of-day"]
+    },
+    {
+      "id": "card-003",
+      "front": {
+        "text": "How are you?",
+        "hint": "Asking about wellbeing"
+      },
+      "back": {
+        "text": "¿Cómo estás?",
+        "alternatives": ["Como estas", "¿Cómo está?", "Como esta"],
+        "explanation": "'Estás' is informal (tú), 'Está' is formal (usted)"
+      },
+      "tags": ["question", "conversation"]
+    },
+    {
+      "id": "card-004",
+      "front": {
+        "text": "Thank you",
+        "hint": "Expressing gratitude"
+      },
+      "back": {
+        "text": "Gracias",
+        "alternatives": ["Muchas gracias"],
+        "example": "Gracias por tu ayuda."
+      },
+      "tags": ["politeness"]
+    },
+    {
+      "id": "card-005",
+      "front": {
+        "text": "Goodbye",
+        "hint": "Parting word"
+      },
+      "back": {
+        "text": "Adiós",
+        "alternatives": ["Adios", "Hasta luego", "Chao"],
+        "explanation": "'Hasta luego' means 'see you later', 'Chao' is informal"
+      },
+      "tags": ["parting"]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "tuizlet",
+  "version": "0.1.0",
+  "description": "A terminal-based quiz experience powered by AI",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.7",
+    "@opentui/core": "^0.1.72",
+    "zod": "^3.24.0"
+  }
+}
