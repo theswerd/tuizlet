@@ -15,6 +15,14 @@ It allows you to create, study, and share flashcards in your terminal. It is mad
 - [ ] Analytics on what you know and don't know
 - [ ] Spaced repetition algo for flashcard review scheduling
 - [ ] Multi directory support (../.tuizlet in multiple layers)
+- [ ] Retype correct answer when you get a question wrong
+
+### Maybe features
+
+- [ ] AI deeper integration. Might add claude code sdk for on demand generation, explanations, custom quiz creations, or analytics.
+- [ ] Other flashcard games like matching, top down quizzes, etc.
+- [ ] Question expiration during learning (5 second timer to answer)
+- [ ] Bug me mode — have tuizlet send notifications kinda like Duolingo
 
 ### Build in themes
 
