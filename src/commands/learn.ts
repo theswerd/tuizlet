@@ -39,6 +39,16 @@ interface LearnState {
   showingResult: boolean;
   lastAnswerCorrect: boolean;
   correctAnswer: string;
+  // Timer state
+  questionStartTime: number;
+  elapsedSeconds: number;
+  timerIntervalId: ReturnType<typeof setInterval> | null;
+  // Total time tracking
+  sessionStartTime: number;
+  totalElapsedSeconds: number;
+  // Pause state
+  paused: boolean;
+  pausedAt: number | null;
 }
 
 // ============================================================================
@@ -62,6 +72,50 @@ function shuffle<T>(array: T[]): T[] {
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10);
+}
+
+function formatTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function startTimer(state: LearnState, renderer: Renderer, title: string): void {
+  stopTimer(state);
+  state.questionStartTime = Date.now();
+  state.elapsedSeconds = 0;
+  state.timerIntervalId = setInterval(() => {
+    if (!state.paused) {
+      state.elapsedSeconds = Math.floor((Date.now() - state.questionStartTime) / 1000);
+      state.totalElapsedSeconds = Math.floor((Date.now() - state.sessionStartTime) / 1000);
+      render(renderer, state, title);
+    }
+  }, 1000);
+}
+
+function stopTimer(state: LearnState): void {
+  if (state.timerIntervalId !== null) {
+    clearInterval(state.timerIntervalId);
+    state.timerIntervalId = null;
+  }
+}
+
+function pauseTimer(state: LearnState): void {
+  state.paused = true;
+  state.pausedAt = Date.now();
+}
+
+function resumeTimer(state: LearnState): void {
+  if (state.paused && state.pausedAt !== null) {
+    const pauseDuration = Date.now() - state.pausedAt;
+    state.questionStartTime += pauseDuration;
+    state.sessionStartTime += pauseDuration;
+    state.paused = false;
+    state.pausedAt = null;
+  }
 }
 
 // ============================================================================
@@ -256,10 +310,20 @@ export async function runLearnCommand(
     showingResult: false,
     lastAnswerCorrect: false,
     correctAnswer: "",
+    questionStartTime: Date.now(),
+    elapsedSeconds: 0,
+    timerIntervalId: null,
+    sessionStartTime: Date.now(),
+    totalElapsedSeconds: 0,
+    paused: false,
+    pausedAt: null,
   };
 
   // Initial render
   render(renderer, state, title);
+
+  // Start timer for first question
+  startTimer(state, renderer, title);
 
   // Handle keyboard input
   const keyHandler = (renderer as any)._keyHandler;
@@ -270,8 +334,31 @@ export async function runLearnCommand(
       const currentQuestion = state.questions[state.currentIndex];
 
       if (state.currentIndex >= state.questions.length) {
+        stopTimer(state);
         keyHandler.off("keypress", handleKey);
         resolve();
+        return;
+      }
+
+      // Handle pause menu
+      if (state.paused) {
+        if (keyName === "escape" || keyName === "r") {
+          // Resume
+          resumeTimer(state);
+          render(renderer, state, title);
+        } else if (keyName === "q" || keyName === "h") {
+          // Quit to home
+          stopTimer(state);
+          keyHandler.off("keypress", handleKey);
+          resolve();
+        }
+        return;
+      }
+
+      // Escape to pause
+      if (keyName === "escape") {
+        pauseTimer(state);
+        render(renderer, state, title);
         return;
       }
 
@@ -282,6 +369,10 @@ export async function runLearnCommand(
         state.typedAnswer = "";
         state.answered = false;
         render(renderer, state, title);
+        // Start timer for next question (if there is one)
+        if (state.currentIndex < state.questions.length) {
+          startTimer(state, renderer, title);
+        }
         return;
       }
 
@@ -329,6 +420,7 @@ function handleMultipleChoiceKey(
   if (optionIndex >= 0 && optionIndex < numOptions && !state.answered) {
     state.selectedOption = optionIndex;
     state.answered = true;
+    stopTimer(state);
 
     const selectedOpt = currentQuestion.options![optionIndex]!;
     state.lastAnswerCorrect = selectedOpt.isCorrect;
@@ -360,6 +452,7 @@ function handleTypeAnswerKey(
   } else if (keyName === "return" || keyName === "enter") {
     if (state.typedAnswer.trim().length > 0) {
       state.answered = true;
+      stopTimer(state);
 
       const result = matchAnswer(state.typedAnswer, currentQuestion.correctAnswers, {
         ignoreCase: true,
@@ -396,6 +489,11 @@ function handleTypeAnswerKey(
 function render(renderer: Renderer, state: LearnState, quizTitle: string): void {
   clearScreen(renderer);
 
+  if (state.paused) {
+    renderPauseMenu(renderer, state, quizTitle);
+    return;
+  }
+
   if (state.currentIndex >= state.questions.length) {
     renderComplete(renderer, state, quizTitle);
     return;
@@ -410,9 +508,8 @@ function render(renderer: Renderer, state: LearnState, quizTitle: string): void 
   }
 }
 
-function renderMultipleChoice(renderer: Renderer, state: LearnState, quizTitle: string): void {
+function renderPauseMenu(renderer: Renderer, state: LearnState, quizTitle: string): void {
   const colors = getColors();
-  const current = state.questions[state.currentIndex]!;
   const progress = `${state.currentIndex + 1}/${state.questions.length}`;
 
   renderer.root.add(
@@ -425,6 +522,49 @@ function renderMultipleChoice(renderer: Renderer, state: LearnState, quizTitle: 
         Box(
           { flexDirection: "row", gap: 2 },
           Text({ content: progress, attributes: TextAttributes.DIM }),
+          Text({ content: `✓ ${state.correct}`, fg: colors.success }),
+          Text({ content: `✗ ${state.incorrect}`, fg: colors.error }),
+        ),
+      ),
+      // Pause menu
+      Box(
+        { flexDirection: "column", marginTop: 2, marginBottom: 2 },
+        Text({ content: "⏸ Paused", attributes: TextAttributes.BOLD, fg: colors.warning }),
+        Text({ content: "" }),
+        Text({ content: "  r  Resume", fg: colors.secondary }),
+        Text({ content: "  q  Quit to home", fg: colors.secondary }),
+      ),
+      // Total time at bottom
+      Box(
+        { marginTop: 2 },
+        Text({
+          content: `Total time: ${formatTime(state.totalElapsedSeconds)}`,
+          attributes: TextAttributes.DIM,
+        }),
+      ),
+    ),
+  );
+}
+
+function renderMultipleChoice(renderer: Renderer, state: LearnState, quizTitle: string): void {
+  const colors = getColors();
+  const current = state.questions[state.currentIndex]!;
+  const progress = `${state.currentIndex + 1}/${state.questions.length}`;
+  const timerText = `⏱ ${formatTime(state.elapsedSeconds)}`;
+  const timerColor = state.answered ? undefined : colors.secondary;
+  const timerAttrs = state.answered ? TextAttributes.DIM : TextAttributes.NONE;
+
+  renderer.root.add(
+    Box(
+      { flexDirection: "column", padding: 1, flexGrow: 1 },
+      // Header
+      Box(
+        { flexDirection: "row", justifyContent: "space-between", marginBottom: 1 },
+        Text({ content: quizTitle, attributes: TextAttributes.BOLD }),
+        Box(
+          { flexDirection: "row", gap: 2 },
+          Text({ content: progress, attributes: TextAttributes.DIM }),
+          Text({ content: timerText, fg: timerColor, attributes: timerAttrs }),
           Text({ content: `✓ ${state.correct}`, fg: colors.success }),
           Text({ content: `✗ ${state.incorrect}`, fg: colors.error }),
         ),
@@ -464,12 +604,13 @@ function renderMultipleChoice(renderer: Renderer, state: LearnState, quizTitle: 
           Text({ content: `${prefix}${option.text}${suffix}`, attributes: attrs, fg }),
         );
       }),
-      // Instructions
+      // Instructions and total time
       Box(
-        { marginTop: 2 },
+        { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
         state.showingResult
           ? Text({ content: "Press any key to continue...", attributes: TextAttributes.DIM })
-          : Text({ content: "Press 1-4, a-d, or ↑↓ + Enter", attributes: TextAttributes.DIM }),
+          : Text({ content: "Press 1-4, a-d, or ↑↓ + Enter  |  Esc Pause", attributes: TextAttributes.DIM }),
+        Text({ content: `Total: ${formatTime(state.totalElapsedSeconds)}`, attributes: TextAttributes.DIM }),
       ),
     ),
   );
@@ -479,6 +620,9 @@ function renderTypeAnswer(renderer: Renderer, state: LearnState, quizTitle: stri
   const colors = getColors();
   const current = state.questions[state.currentIndex]!;
   const progress = `${state.currentIndex + 1}/${state.questions.length}`;
+  const timerText = `⏱ ${formatTime(state.elapsedSeconds)}`;
+  const timerColor = state.answered ? undefined : colors.secondary;
+  const timerAttrs = state.answered ? TextAttributes.DIM : TextAttributes.NONE;
 
   const inputDisplay = state.typedAnswer || (state.answered ? "" : "");
   const cursor = state.answered ? "" : "▌";
@@ -493,6 +637,7 @@ function renderTypeAnswer(renderer: Renderer, state: LearnState, quizTitle: stri
         Box(
           { flexDirection: "row", gap: 2 },
           Text({ content: progress, attributes: TextAttributes.DIM }),
+          Text({ content: timerText, fg: timerColor, attributes: timerAttrs }),
           Text({ content: `✓ ${state.correct}`, fg: colors.success }),
           Text({ content: `✗ ${state.incorrect}`, fg: colors.error }),
         ),
@@ -527,12 +672,13 @@ function renderTypeAnswer(renderer: Renderer, state: LearnState, quizTitle: stri
               attributes: TextAttributes.BOLD,
             }),
       ),
-      // Instructions
+      // Instructions and total time
       Box(
-        { marginTop: 2 },
+        { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
         state.showingResult
           ? Text({ content: "Press any key to continue...", attributes: TextAttributes.DIM })
-          : Text({ content: "Type your answer and press Enter", attributes: TextAttributes.DIM }),
+          : Text({ content: "Type your answer and press Enter  |  Esc Pause", attributes: TextAttributes.DIM }),
+        Text({ content: `Total: ${formatTime(state.totalElapsedSeconds)}`, attributes: TextAttributes.DIM }),
       ),
     ),
   );
@@ -557,6 +703,8 @@ function renderComplete(renderer: Renderer, state: LearnState, quizTitle: string
         Text({ content: `✓ ${state.correct}`, fg: colors.success }),
         Text({ content: `✗ ${state.incorrect}`, fg: colors.error }),
       ),
+      Text({ content: "" }),
+      Text({ content: `Total time: ${formatTime(state.totalElapsedSeconds)}`, attributes: TextAttributes.DIM }),
       Text({ content: "" }),
       Text({ content: "Press any key to continue...", attributes: TextAttributes.DIM }),
     ),
